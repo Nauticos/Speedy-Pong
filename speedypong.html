@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>
+            Speedy Pong
+        </title>
+        <style>
+            body {
+                margin: 0;
+                background: rgb(43, 43, 43);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                font-family: 'Courier New', Courier, monospace;
+                position: relative;
+            }
+            canvas {
+                background: black;
+                border: 2px solid grey
+            }
+            #controls {
+                position:absolute;
+                top: 10px;
+                color: lightgrey;
+                text-align: center;
+                width: 100%;
+                font-size: 15px;
+            }
+            #startOverlay {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                gap: 16px;
+                background: rgba(0, 0, 0, 0.72);
+                color: white;
+                z-index: 10;
+            }
+            #startButton {
+                padding: 12px 24px;
+                font-size: 20px;
+                font-family: 'Courier New', Courier, monospace;
+                border: 2px solid white;
+                background: transparent;
+                color: white;
+                cursor: pointer;
+            }
+            #countdownText {
+                font-size: 48px;
+                font-weight: bold;
+                visibility: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="controls">
+            W/S = Left Paddle &nbsp;&nbsp; I/K = Right Paddle
+        </div>
+        <div id="startOverlay">
+            <button id="startButton">Play</button>
+            <div id="countdownText"></div>
+        </div>
+        <canvas id="pong" width="800" height="500"></canvas>
+
+        <script>
+            const paddleSpeed = 6
+            const paddleHeight = 120
+            const paddleWidth = 12
+            const winScore = 10
+
+            const canvas = document.getElementById("pong");
+            const ctx = canvas.getContext("2d");
+            const startOverlay = document.getElementById("startOverlay");
+            const startButton = document.getElementById("startButton");
+            const countdownText = document.getElementById("countdownText");
+
+            const W = canvas.width;
+            const H = canvas.height;
+
+            let leftPaddle = {x: 20, y: H/2 - paddleHeight/2, dy: 0};
+            let rightPaddle = {x: W - 20 - paddleWidth, y: H/2 - paddleHeight/2, dy: 0};
+
+            let ballSpeed = 2
+            let ball = {x: W/2, y: H/2, dx: ballSpeed, dy: ballSpeed, size: 9};
+
+            let leftScore = 0;
+            let rightScore = 0;
+            let gameStarted = false;
+            let countdownActive = false;
+            let countdownTimer = null;
+            let ballPausedUntil = 0;
+
+            const keys = {};
+            document.addEventListener("keydown", e => keys[e.key] = true);
+            document.addEventListener("keyup", e => keys[e.key] = false);
+
+            function resetBall(direction) {
+                ballSpeed = 2;
+                ball.x = W/2;
+                ball.y = H/2;
+                ball.dx = ballSpeed * direction;
+                ball.dy = ballSpeed * (Math.random() > 0.5 ? 1 : -1);
+                ballPausedUntil = performance.now() + 1000;
+            }
+
+            function startCountdown() {
+                if (countdownActive) return;
+
+                countdownActive = true;
+                countdownText.textContent = "3";
+                countdownText.style.visibility = "visible";
+                startButton.style.display = "none";
+                startOverlay.style.display = "flex";
+
+                let count = 3;
+                countdownTimer = setInterval(() => {
+                    count -= 1;
+                    if (count > 0) {
+                        countdownText.textContent = count;
+                    } else {
+                        clearInterval(countdownTimer);
+                        countdownActive = false;
+                        gameStarted = true;
+                        countdownText.style.visibility = "hidden";
+                        startOverlay.style.display = "none";
+                    }
+                }, 1000);
+            }
+
+            startButton.addEventListener("click", startCountdown);
+
+            function update() {
+                if (!gameStarted) return;
+
+                if (keys["w"] || keys["W"]) leftPaddle.y -= paddleSpeed;
+                if (keys["s"] || keys["S"]) leftPaddle.y += paddleSpeed;
+                if (keys["i"] || keys["I"]) rightPaddle.y -= paddleSpeed;
+                if (keys["k"] || keys["K"]) rightPaddle.y += paddleSpeed;
+
+                leftPaddle.y = Math.max(0, Math.min(H - paddleHeight, leftPaddle.y));
+                rightPaddle.y = Math.max(0, Math.min(H - paddleHeight, rightPaddle.y));
+
+                if (performance.now() < ballPausedUntil) {
+                    return;
+                }
+
+                ball.x += ball.dx;
+                ball.y += ball.dy;
+
+                if (ball.y - ball.size < 0 || ball.y + ball.size > H) {
+                    ball.dy *= -1
+                }
+
+                if (
+                    ball.x - ball.size < leftPaddle.x + paddleWidth &&
+                    ball.y > leftPaddle.y &&
+                    ball.y < leftPaddle.y + paddleHeight &&
+                    ball.dx < 0
+                ) {
+                    ballSpeed++;
+                    ball.dx = ballSpeed;
+                    let hitPos = (ball.y - (leftPaddle.y + paddleHeight/2)) / (paddleHeight/2);
+                    ball.dy = hitPos * ballSpeed;
+                }
+
+                if (
+                    ball.x + ball.size > rightPaddle.x &&
+                    ball.y > rightPaddle.y &&
+                    ball.y < rightPaddle.y + paddleHeight &&
+                    ball.dx > 0
+                ) {
+                    ballSpeed++;
+                    ball.dx = -ballSpeed;
+                    let hitPos = (ball.y - (rightPaddle.y + paddleHeight/2)) / (paddleHeight/2);
+                    ball.dy = hitPos * ballSpeed;
+                }
+
+                if (ball.x < 0) {
+                    rightScore++;
+                    resetBall(1);
+                } else if (ball.x > W) {
+                    leftScore++;
+                    resetBall(-1);
+                }
+            }
+
+            function draw() {
+                ctx.fillStyle = "#000";
+                ctx.fillRect (0, 0, W, H);
+
+                ctx.strokeStyle = "#555";
+                ctx.setLineDash([10,10]);
+                ctx.beginPath();
+                ctx.moveTo(W / 2, 0);
+                ctx.lineTo(W / 2, H);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(leftPaddle.x, leftPaddle.y, paddleWidth, paddleHeight);
+                ctx.fillRect(rightPaddle.x, rightPaddle.y, paddleWidth, paddleHeight);
+
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.font = "40px 'Courier New', Courier, monospace";
+                ctx.fillText(leftScore, W / 2 - 60, 50);
+                ctx.fillText(rightScore, W / 2 + 40, 50);
+
+                if (leftScore >= winScore || rightScore >= winScore) {
+                    ctx.font = "50px 'Courier New', Courier, monospace";
+                    const winner = leftScore > rightScore ? "Left" : "Right";
+                    ctx.fillText(winner + " wins!", W / 2 - 140, H / 2);
+                }
+            }
+
+            function loop() {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            loop();
+        </script>
+    </body>
+</html>
