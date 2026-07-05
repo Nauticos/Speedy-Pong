@@ -9,9 +9,9 @@ A browser-based Pong clone made from HTML, CSS, and JavaScript.
 * First player to score 10 points wins
 * After each collision with a paddle, the ball will speed up
 
-**How to run it**
+**Demo**
 
-Just double-click speedypong.html or go to 
+https://nauticos.github.io/Speedy-Pong/
 
 **Controls**
 
